@@ -2,6 +2,7 @@ import torch
 from datasets import load_dataset
 import argparse
 import os
+os.environ['TRANSFORMERS_CACHE'] = './tmp/'
 import wandb
 from datetime import timedelta
 from torch.utils.data import DataLoader
@@ -28,6 +29,8 @@ def find_all_linear_names(model):
 
 
 def main(args):
+
+    print(args)
 
     if args.output_dir:
         os.makedirs(args.output_dir, exist_ok=True)
@@ -63,7 +66,7 @@ def main(args):
         config=config
     )
 
-    train_dataset = load_dataset(args.dataset, split='train')
+    train_dataset = load_dataset(args.dataset, split='train', cache_dir='./tmp/data/')
     train_loader = DataLoader(
         train_dataset,
         collate_fn=default_data_collator,

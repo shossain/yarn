@@ -13,3 +13,4 @@ pandas
 numpy
 peft
 wandb
+bitsandbytes

@@ -79,7 +79,7 @@ def main(args):
         target_modules = find_all_linear_names(model)
         accelerator.print(f"LoRA target modules: {target_modules}")
         peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False,
-                                 r=16, lora_alpha=64, lora_dropout=0.05, target_modules=target_modules)
+                                 r=8, lora_alpha=16, lora_dropout=0.05, target_modules=target_modules)
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
@@ -89,6 +89,9 @@ def main(args):
     model, optim, train_loader, scheduler = accelerator.prepare(
         model, optim, train_loader, scheduler
     )
+
+    print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
+
 
     if not args.lora:
         model.gradient_checkpointing_enable()
@@ -150,6 +153,8 @@ def main(args):
                     if args.output_dir is not None:
                         output_dir = os.path.join(args.output_dir, output_dir)
                     accelerator.save_state(output_dir)
+
+        print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
 
         if completed_steps >= args.max_train_steps:
             break

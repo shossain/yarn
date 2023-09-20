@@ -62,7 +62,9 @@ def main(args):
 
     model = LlamaForCausalLM.from_pretrained(
         args.model,
-        torch_dtype=torch.bfloat16,
+        load_in_8bit=True,
+        torch_dtype=torch.float16,
+        #torch_dtype=torch.bfloat16,
         config=config
     )
 

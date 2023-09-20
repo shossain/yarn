@@ -2,6 +2,7 @@ import torch
 from datasets import load_dataset
 import argparse
 import os
+import gc
 os.environ['TRANSFORMERS_CACHE'] = './tmp/'
 import wandb
 from datetime import timedelta
@@ -143,6 +144,9 @@ def main(args):
             optim.step()
             scheduler.step()
             optim.zero_grad()
+            gc.collect()
+            torch.cuda.empty_cache()
+            accelerator.free_memory()
 
         if accelerator.sync_gradients:
             progress_bar.update(1)

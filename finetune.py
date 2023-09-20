@@ -11,7 +11,7 @@ from accelerate import Accelerator
 from accelerate.utils import InitProcessGroupKwargs, set_seed, DummyOptim, DummyScheduler
 from tqdm import tqdm
 from transformers import set_seed, default_data_collator
-from deepspeed.accelerator import get_accelerator
+# from deepspeed.accelerator import get_accelerator
 
 
 from scaled_rope.modeling_llama_together_yarn import LlamaForCausalLM
@@ -148,7 +148,7 @@ def main(args):
             optim.zero_grad()
             gc.collect()
             torch.cuda.empty_cache()
-            get_accelerator().empty_cache()
+            # get_accelerator().empty_cache()
 
         if accelerator.sync_gradients:
             progress_bar.update(1)

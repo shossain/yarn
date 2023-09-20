@@ -146,7 +146,7 @@ def main(args):
             optim.zero_grad()
             gc.collect()
             torch.cuda.empty_cache()
-            accelerator.free_memory()
+            accelerator.empty_cache()
 
         if accelerator.sync_gradients:
             progress_bar.update(1)

@@ -14,3 +14,4 @@ numpy
 peft
 wandb
 bitsandbytes
+deepspeed

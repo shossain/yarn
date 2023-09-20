@@ -62,9 +62,7 @@ def main(args):
 
     model = LlamaForCausalLM.from_pretrained(
         args.model,
-        load_in_8bit=True,
-        torch_dtype=torch.float16,
-        #torch_dtype=torch.bfloat16,
+        torch_dtype=torch.bfloat16,
         config=config
     )
 
@@ -78,7 +76,8 @@ def main(args):
 
     if args.lora:
         from peft import get_peft_model, LoraConfig, TaskType
-        target_modules = find_all_linear_names(model)
+        #target_modules = find_all_linear_names(model)
+        target_modules = ['q_proj', 'k_proj', 'v_proj', 'o_proj']
         accelerator.print(f"LoRA target modules: {target_modules}")
         peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False,
                                  r=8, lora_alpha=16, lora_dropout=0.05, target_modules=target_modules)

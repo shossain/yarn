@@ -94,6 +94,8 @@ def main(args):
         model, optim, train_loader, scheduler
     )
 
+    model.config.use_cache = False
+
     print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
 
 

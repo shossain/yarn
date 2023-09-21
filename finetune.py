@@ -69,6 +69,8 @@ def main(args):
         config=config
     )
 
+    model.config.use_cache = False
+
     train_dataset = load_dataset(args.dataset, split='train', cache_dir='./tmp/data/')
     train_loader = DataLoader(
         train_dataset,
@@ -94,7 +96,6 @@ def main(args):
         model, optim, train_loader, scheduler
     )
 
-    model.config.use_cache = False
 
     print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
 

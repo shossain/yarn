@@ -46,8 +46,7 @@ def main(args):
     timeout = InitProcessGroupKwargs(timeout=timedelta(seconds=1_000_000))
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulate_every,
-        #mixed_precision="bf16",
-        mixed_precision="no",
+        mixed_precision="bf16",
         log_with="wandb" if args.wandb else None,
         kwargs_handlers=[timeout]
     )

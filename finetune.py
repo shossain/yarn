@@ -71,7 +71,7 @@ def main(args):
     )
 
     try:
-        train_dataset = load_dataset(args.dataset, split="train")
+        train_dataset = load_dataset(args.dataset, split="train", cache_dir='./tmp/data/')
     except:
         train_dataset = load_from_disk(args.dataset)
     if args.truncate:

@@ -1,5 +1,5 @@
 import torch
-from datasets import load_dataset, load_from_disk
+from datasets import load_dataset, load_from_disk, concatenate_datasets
 import argparse
 import os
 import gc
@@ -70,10 +70,15 @@ def main(args):
         config=config
     )
 
-    try:
-        train_dataset = load_dataset(args.dataset, split="train", cache_dir='./tmp/data/')
-    except:
-        train_dataset = load_from_disk(args.dataset)
+    train_datasets = []
+    for dataset in args.datasets.split(","):
+        try:
+            train_dataset = load_dataset(dataset, split="train", cache_dir='./tmp/data/')
+        except:
+            train_dataset = load_from_disk(dataset)
+        train_datasets.append(train_dataset)
+    train_dataset = concatenate_datasets(train_datasets)
+
     if args.truncate:
         def truncate(sample):
             sample["input_ids"] = sample["input_ids"][0:args.truncate]
@@ -107,7 +112,7 @@ def main(args):
     )
 
 
-    print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
+    # print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
 
 
     if not args.lora:
@@ -137,6 +142,7 @@ def main(args):
             int(training_difference.replace("step_", ""))
         )
 
+    full_train_loader = train_loader
     if args.resume_from_checkpoint and resume_step is not None:
         train_loader = accelerator.skip_first_batches(
             train_loader, resume_step)
@@ -145,39 +151,43 @@ def main(args):
         accelerator.print(f"Resuming training from step {resume_step}")
 
     model.train()
-    for step, batch in enumerate(train_loader):
-        with accelerator.accumulate(model):
-            loss = model(**batch).loss
-            accelerator.backward(loss)
+
+    while completed_steps < args.max_train_steps
+        for step, batch in enumerate(train_loader):
+            with accelerator.accumulate(model):
+                loss = model(**batch).loss
+                accelerator.backward(loss)
+
+                if accelerator.sync_gradients:
+                    accelerator.log({"loss": loss.item()}, step=completed_steps)
+                    if isinstance(args.grad_norm, float):
+                        accelerator.clip_grad_norm_(
+                            model.parameters(), args.grad_norm)
+
+                optim.step()
+                scheduler.step()
+                optim.zero_grad()
+                gc.collect()
+                torch.cuda.empty_cache()
+                # get_accelerator().empty_cache()
 
             if accelerator.sync_gradients:
-                accelerator.log({"loss": loss.item()}, step=completed_steps)
-                if isinstance(args.grad_norm, float):
-                    accelerator.clip_grad_norm_(
-                        model.parameters(), args.grad_norm)
+                progress_bar.update(1)
+                completed_steps += 1
 
-            optim.step()
-            scheduler.step()
-            optim.zero_grad()
-            gc.collect()
-            torch.cuda.empty_cache()
-            # get_accelerator().empty_cache()
+                if isinstance(args.checkpointing_steps, int) and completed_steps > 0:
+                    if completed_steps % args.checkpointing_steps == 0:
+                        output_dir = f"step_{completed_steps}"
+                        if args.output_dir is not None:
+                            output_dir = os.path.join(args.output_dir, output_dir)
+                        accelerator.save_state(output_dir)
 
-        if accelerator.sync_gradients:
-            progress_bar.update(1)
-            completed_steps += 1
+            # print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
 
-            if isinstance(args.checkpointing_steps, int) and completed_steps > 0:
-                if completed_steps % args.checkpointing_steps == 0:
-                    output_dir = f"step_{completed_steps}"
-                    if args.output_dir is not None:
-                        output_dir = os.path.join(args.output_dir, output_dir)
-                    accelerator.save_state(output_dir)
+            if completed_steps >= args.max_train_steps:
+                break
 
-        print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
-
-        if completed_steps >= args.max_train_steps:
-            break
+        train_loader = full_train_loader
 
     accelerator.print(f"Training Finished")
     accelerator.end_training()
@@ -217,6 +227,6 @@ if __name__ == "__main__":
     args.add_argument("--scaling-type", type=str)
     args.add_argument("--rope-theta", type=float, default=10000.0)
     args.add_argument("--truncate", type=int)
-    args.add_argument("--dataset", type=str,
+    args.add_argument("--datasets", type=str,
                       default="emozilla/pg_books-tokenized-bos-eos-chunked-65536")
     main(args.parse_args())

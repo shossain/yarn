@@ -152,7 +152,7 @@ def main(args):
 
     model.train()
 
-    while completed_steps < args.max_train_steps
+    while completed_steps < args.max_train_steps:
         for step, batch in enumerate(train_loader):
             with accelerator.accumulate(model):
                 loss = model(**batch).loss

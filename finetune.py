@@ -33,7 +33,7 @@ def find_all_linear_names(model):
 
 def main(args):
 
-    print(args)
+    accelerator.print(args)
 
     if args.output_dir:
         os.makedirs(args.output_dir, exist_ok=True)

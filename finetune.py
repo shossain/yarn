@@ -48,11 +48,11 @@ def main(args):
         log_with="wandb" if args.wandb else None,
         kwargs_handlers=[timeout]
     )
-    accelerator.print(args)
 
     accelerator.init_trackers(
         project_name=args.wandb if args.wandb else "yarn",
     )
+    accelerator.print(args)
     accelerator.print(f"Total GPUS: {accelerator.num_processes}")
 
     config = LlamaConfig.from_pretrained(args.model)

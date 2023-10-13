@@ -189,7 +189,7 @@ def main(args):
                         try:
                             shutil.rmtree(previous_dir)
                         except OSError as e:
-                            print("Error: %s : %s" % (previous_dir, e.strerror))
+                            accelerator.print("Error: %s : %s" % (previous_dir, e.strerror))
 
             # print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
 

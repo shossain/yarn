@@ -3,7 +3,7 @@ from datasets import load_dataset, load_from_disk, concatenate_datasets
 import argparse
 import os
 import gc
-os.environ['TRANSFORMERS_CACHE'] = '/cache/'
+os.environ['TRANSFORMERS_CACHE'] = '../../cache/'
 import wandb
 from datetime import timedelta
 from torch.utils.data import DataLoader
@@ -75,7 +75,7 @@ def main(args):
     train_datasets = []
     for dataset in args.datasets.split(","):
         try:
-            train_dataset = load_dataset(dataset, split="train", cache_dir='/cache/data/')
+            train_dataset = load_dataset(dataset, split="train", cache_dir='../../cache/data/')
         except:
             train_dataset = load_from_disk(dataset)
         train_datasets.append(train_dataset)

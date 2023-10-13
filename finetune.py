@@ -97,12 +97,12 @@ def main(args):
 
     if args.lora:
         from peft import get_peft_model, LoraConfig, TaskType
-        #target_modules = find_all_linear_names(model)
+        target_modules = find_all_linear_names(model)
         #target_modules = ['q_proj', 'k_proj', 'v_proj', 'o_proj']
-        target_modules = ['q_proj', 'v_proj']
+        # target_modules = ['q_proj', 'v_proj']
         accelerator.print(f"LoRA target modules: {target_modules}")
         peft_config = LoraConfig(task_type=TaskType.CAUSAL_LM, inference_mode=False,
-                                 r=8, lora_alpha=16, lora_dropout=0.05, target_modules=target_modules)
+                                 r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=0.05, target_modules=target_modules)
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
@@ -230,6 +230,8 @@ if __name__ == "__main__":
     args.add_argument("--learning-rate", type=float, default=2e-5)
     args.add_argument("--grad-norm", action="store_true")
     args.add_argument("--lora", action="store_true")
+    args.add_argument("--lora_r", type=int, default=16)
+    args.add_argument("--lora_alpha", type=int, default=64)
     args.add_argument("--model", type=str,
                       default="NousResearch/Llama-2-7b-hf")
     args.add_argument("--scaling-factor", type=float, default=16.0)

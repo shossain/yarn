@@ -147,7 +147,7 @@ def main(args):
     full_train_loader = train_loader
     if args.resume_from_checkpoint and resume_step is not None:
         train_loader = accelerator.skip_first_batches(
-            train_loader, len(train_dataset) % resume_step)
+            train_loader, resume_step % len(train_dataset))
         completed_steps += resume_step
         progress_bar.update(resume_step)
         accelerator.print(f"Resuming training from step {resume_step}")

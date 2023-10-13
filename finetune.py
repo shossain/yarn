@@ -3,7 +3,7 @@ from datasets import load_dataset, load_from_disk, concatenate_datasets
 import argparse
 import os
 import gc
-os.environ['TRANSFORMERS_CACHE'] = './tmp/'
+os.environ['TRANSFORMERS_CACHE'] = '/cache/'
 import wandb
 from datetime import timedelta
 from torch.utils.data import DataLoader
@@ -11,6 +11,8 @@ from accelerate import Accelerator
 from accelerate.utils import InitProcessGroupKwargs, set_seed, DummyOptim, DummyScheduler
 from tqdm import tqdm
 from transformers import set_seed, default_data_collator
+import shutil
+
 # from deepspeed.accelerator import get_accelerator
 
 
@@ -73,7 +75,7 @@ def main(args):
     train_datasets = []
     for dataset in args.datasets.split(","):
         try:
-            train_dataset = load_dataset(dataset, split="train", cache_dir='./tmp/data/')
+            train_dataset = load_dataset(dataset, split="train", cache_dir='/cache/data/')
         except:
             train_dataset = load_from_disk(dataset)
         train_datasets.append(train_dataset)
@@ -145,7 +147,7 @@ def main(args):
     full_train_loader = train_loader
     if args.resume_from_checkpoint and resume_step is not None:
         train_loader = accelerator.skip_first_batches(
-            train_loader, resume_step)
+            train_loader, len(train_dataset) % resume_step)
         completed_steps += resume_step
         progress_bar.update(resume_step)
         accelerator.print(f"Resuming training from step {resume_step}")
@@ -181,6 +183,13 @@ def main(args):
                         if args.output_dir is not None:
                             output_dir = os.path.join(args.output_dir, output_dir)
                         accelerator.save_state(output_dir)
+
+                        previous_dir = f"step_{completed_steps-args.checkpointing_steps}"
+                        previous_dir = os.path.join(args.output_dir, previous_dir)
+                        try:
+                            shutil.rmtree(previous_dir)
+                        except OSError as e:
+                            print("Error: %s : %s" % (previous_dir, e.strerror))
 
             # print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
 

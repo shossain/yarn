@@ -32,11 +32,24 @@ def find_all_linear_names(model):
 
     return list(lora_module_names)
 
+def save_model(accelerator, model, output_dir):
+    accelerator.print(f"Saving model to {output_dir}")
+    
+    accelerator.wait_for_everyone()
+    unwrapped_model = accelerator.unwrap_model(model)
+
+    unwrapped_model.save_pretrained(
+        f"{output_dir}",
+        is_main_process=accelerator.is_main_process,
+        save_function=accelerator.save,
+        state_dict=accelerator.get_state_dict(model),
+    )
+
+    accelerator.print(f"Saving Finished")
 
 def main(args):
 
-    if args.output_dir:
-        os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
 
     if args.wandb:
         wandb.login()
@@ -179,10 +192,7 @@ def main(args):
 
                 if isinstance(args.checkpointing_steps, int) and completed_steps > 0:
                     if completed_steps % args.checkpointing_steps == 0:
-                        output_dir = f"step_{completed_steps}"
-                        if args.output_dir is not None:
-                            output_dir = os.path.join(args.output_dir, output_dir)
-                        accelerator.save_state(output_dir)
+                        save_model(accelerator, model, args.output_dir)
 
                         previous_dir = f"step_{completed_steps-args.checkpointing_steps}"
                         previous_dir = os.path.join(args.output_dir, previous_dir)
@@ -190,6 +200,10 @@ def main(args):
                             shutil.rmtree(previous_dir)
                         except OSError as e:
                             accelerator.print("Error: %s : %s" % (previous_dir, e.strerror))
+
+                        output_dir = f"step_{completed_steps}"
+                        output_dir = os.path.join(args.output_dir, output_dir)
+                        accelerator.save_state(output_dir)
 
             # print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
 
@@ -201,19 +215,7 @@ def main(args):
     accelerator.print(f"Training Finished")
     accelerator.end_training()
 
-    accelerator.print(f"Saving model to {args.output_dir}")
-    if args.output_dir is not None:
-        accelerator.wait_for_everyone()
-        unwrapped_model = accelerator.unwrap_model(model)
-
-        unwrapped_model.save_pretrained(
-            f"{args.output_dir}",
-            is_main_process=accelerator.is_main_process,
-            save_function=accelerator.save,
-            state_dict=accelerator.get_state_dict(model),
-        )
-
-        accelerator.print(f"Saving Finished")
+    save_model(accelerator, model, args.output_dir)
 
 
 if __name__ == "__main__":

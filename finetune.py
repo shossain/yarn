@@ -222,7 +222,7 @@ if __name__ == "__main__":
     args = argparse.ArgumentParser()
     args.add_argument("--batch-size", type=int, default=1)
     args.add_argument("--gradient-accumulate-every", type=int, default=8)
-    args.add_argument("--resume-from-checkpoint", action="store_true")
+    args.add_argument("--resume-from-checkpoint", type=str)
     args.add_argument("--checkpointing-steps", type=int)
     args.add_argument("--output-dir", type=str, required=True)
     args.add_argument("--wandb", type=str)

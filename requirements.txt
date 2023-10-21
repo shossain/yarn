@@ -16,3 +16,4 @@ wandb
 bitsandbytes
 deepspeed
 optimum
+auto-gptq

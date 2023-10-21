@@ -2,6 +2,8 @@ import torch
 import argparse
 import os
 from transformers import AutoModelForCausalLM, AutoTokenizer, GPTQConfig
+from datasets import load_dataset
+
 os.environ['TRANSFORMERS_CACHE'] = '../../cache/'
 
 
@@ -9,12 +11,14 @@ def main(args):
 
     os.makedirs(args.output_dir, exist_ok=True)
     
+    dataset = load_dataset(args.dataset, split="train", cache_dir='../../cache/data/')
+    dataset = [text for text in dataset["text"]]
     tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
     # Set quantization configuration
     quantization_config = GPTQConfig(
         bits=4,
         group_size=32,
-        dataset=args.dataset,
+        dataset=dataset,
         desc_act=True,
         tokenizer=tokenizer,
         model_seqlen = 16 * 1024 # might not be needed

@@ -27,9 +27,11 @@ def main(args):
     quant_model = AutoModelForCausalLM.from_pretrained(
         args.model, 
         trust_remote_code=True,
+        low_cpu_mem_usage=True,
+        torch_dtype=torch.bfloat16,
         quantization_config=quantization_config, 
-        device_map='auto'
-    ).to("cuda")
+        #device_map='auto'
+    )#.to("cuda")
 
     quant_model.save_pretrained(args.output_dir)
     tokenizer.save_pretrained(args.output_dir)

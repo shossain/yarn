@@ -1,7 +1,7 @@
 accelerate
 datasets
 evaluate
-torch>=2
+torch==2.0.1
 transformers>=4.28.1
 tqdm
 einops

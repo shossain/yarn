@@ -1,23 +1,21 @@
 import torch
 from datasets import load_dataset, load_from_disk, concatenate_datasets
 import argparse
+import copy
+import torch
 import os
 import gc
+import multiprocessing
 os.environ['TRANSFORMERS_CACHE'] = '../../cache/'
-import wandb
 from datetime import timedelta
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 from accelerate.utils import InitProcessGroupKwargs, set_seed, DummyOptim, DummyScheduler
 from tqdm import tqdm
-from transformers import set_seed, default_data_collator
+from transformers import set_seed, default_data_collator, get_linear_schedule_with_warmup, get_constant_schedule_with_warmup
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, StateDictType, FullStateDictConfig
 import shutil
 
-# from deepspeed.accelerator import get_accelerator
-
-
-from scaled_rope.modeling_llama_together_yarn import LlamaForCausalLM
-from scaled_rope.configuration_llama import LlamaConfig
 
 
 def find_all_linear_names(model):
@@ -36,14 +34,21 @@ def save_model(accelerator, model, output_dir):
     accelerator.print(f"Saving model to {output_dir}")
     
     accelerator.wait_for_everyone()
-    unwrapped_model = accelerator.unwrap_model(model)
-
-    unwrapped_model.save_pretrained(
-        f"{output_dir}/model",
+    
+    if args.deepspeed:
+        state_dict = accelerator.get_state_dict(model)
+    else:
+        full_state_dict_config = FullStateDictConfig(
+            offload_to_cpu=True, rank0_only=True)
+        with FSDP.state_dict_type(model, StateDictType.FULL_STATE_DICT, full_state_dict_config):
+            state_dict = accelerator.get_state_dict(model, unwrap=False)
+    accelerator.unwrap_model(model).save_pretrained(
+        f"{args.output_dir}",
         is_main_process=accelerator.is_main_process,
         save_function=accelerator.save,
-        state_dict=accelerator.get_state_dict(model),
+        state_dict=state_dict,
     )
+
 
     accelerator.print(f"Saving Finished")
 
@@ -52,6 +57,7 @@ def main(args):
     os.makedirs(args.output_dir, exist_ok=True)
 
     if args.wandb:
+        import wandb
         wandb.login()
 
     set_seed(args.seed)
@@ -70,19 +76,41 @@ def main(args):
     accelerator.print(args)
     accelerator.print(f"Total GPUS: {accelerator.num_processes}")
 
-    config = LlamaConfig.from_pretrained(args.model)
+    if args.architecture == "llama":
+        from scaled_rope.modeling_llama_yarn import LlamaForCausalLM
+        from scaled_rope.configuration_llama import LlamaConfig
+        config_cls = LlamaConfig
+        model_cls = LlamaForCausalLM
+        original_max_position_embeddings = 4096
+    elif args.architecture == "mistral":
+        from scaled_rope.modeling_mistral_yarn import MistralForCausalLM
+        from scaled_rope.configuration_mistral import MistralConfig
+        config_cls = MistralConfig
+        model_cls = MistralForCausalLM
+        original_max_position_embeddings = 8192
+
+    config = config_cls.from_pretrained(args.model)
     config.rope_scaling = {
         "type": args.scaling_type,
         "factor": args.scaling_factor,
-        "original_max_position_embeddings": 4096
+        "original_max_position_embeddings": original_max_position_embeddings
     }
     config.rope_theta = args.rope_theta
-    config.max_position_embeddings = int(args.scaling_factor * 4096)
+    config.max_position_embeddings = int(args.scaling_factor * original_max_position_embeddings) \
+        if not args.max_position_embeddings else args.max_position_embeddings
 
-    model = LlamaForCausalLM.from_pretrained(
+    sliding_window_attention_schedule = [int(x) for x in args.sliding_window_attention_schedule.split(",")] \
+        if args.sliding_window_attention_schedule else None
+    if sliding_window_attention_schedule is not None and len(sliding_window_attention_schedule) == 1:
+        config.sliding_window = sliding_window_attention_schedule[0]
+        accelerator.print(
+            f"Sliding attention window set to {config.sliding_window}")
+
+    model = model_cls.from_pretrained(
         args.model,
         torch_dtype=torch.bfloat16,
-        config=config
+        config=config,
+        use_flash_attention_2=True
     )
 
     train_datasets = []
@@ -100,7 +128,9 @@ def main(args):
             sample["labels"] = sample["labels"][0:args.truncate]
             sample["attention_mask"] = sample["attention_mask"][0:args.truncate]
             return sample
-        train_dataset = train_dataset.map(truncate, desc="Truncating", num_proc=32)
+        train_dataset = train_dataset.map(
+            truncate, desc="Truncating", num_proc=args.num_proc)
+
     train_loader = DataLoader(
         train_dataset,
         collate_fn=default_data_collator,
@@ -119,12 +149,24 @@ def main(args):
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
-    optim = DummyOptim(model.parameters(), lr=args.learning_rate)
-    scheduler = DummyScheduler(
-        optim, num_training_steps=args.max_train_steps, num_warmup_steps=args.warmup_steps)
-    model, optim, train_loader, scheduler = accelerator.prepare(
-        model, optim, train_loader, scheduler
-    )
+    if args.deepspeed:
+        optim = DummyOptim(model.parameters(), lr=args.learning_rate)
+        scheduler = DummyScheduler(
+            optim, num_training_steps=args.max_train_steps, num_warmup_steps=args.warmup_steps)
+        model, optim, train_loader, scheduler = accelerator.prepare(
+            model, optim, train_loader, scheduler
+        )
+    else:
+        model = accelerator.prepare(model)
+        optim = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+        if args.lr_schedule == "linear":
+            scheduler = get_linear_schedule_with_warmup(
+                optim, num_training_steps=args.max_train_steps, num_warmup_steps=args.warmup_steps)
+        elif args.lr_schedule == "constant":
+            scheduler = get_constant_schedule_with_warmup(
+                optim, num_warmup_steps=args.warmup_steps)
+        optim, train_loader, scheduler = accelerator.prepare(
+            optim, train_loader, scheduler)
 
 
     # print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
@@ -169,6 +211,10 @@ def main(args):
 
     while completed_steps < args.max_train_steps:
         for step, batch in enumerate(train_loader):
+            if sliding_window_attention_schedule is not None:
+                model.config.sliding_window = sliding_window_attention_schedule[completed_steps % len(
+                    sliding_window_attention_schedule)]
+
             with accelerator.accumulate(model):
                 loss = model(**batch).loss
                 accelerator.backward(loss)
@@ -237,9 +283,17 @@ if __name__ == "__main__":
     args.add_argument("--model", type=str,
                       default="NousResearch/Llama-2-7b-hf")
     args.add_argument("--scaling-factor", type=float, default=16.0)
-    args.add_argument("--scaling-type", type=str)
+    args.add_argument("--scaling-type", type=str, default="yarn")
     args.add_argument("--rope-theta", type=float, default=10000.0)
     args.add_argument("--truncate", type=int)
     args.add_argument("--datasets", type=str,
                       default="emozilla/pg_books-tokenized-bos-eos-chunked-65536")
+    args.add_argument("--deepspeed", action="store_true")
+    args.add_argument("--num-proc", type=int, default=multiprocessing.cpu_count())
+    args.add_argument("--architecture", type=str,
+                      choices=["llama", "mistral"], default="llama")
+    args.add_argument("--max-position-embeddings", type=int)
+    args.add_argument("--sliding-window-attention-schedule", type=str)
+    args.add_argument("--lr-schedule", type=str,
+                      choices=["linear", "constant"], default="linear")
     main(args.parse_args())

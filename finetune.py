@@ -30,12 +30,12 @@ def find_all_linear_names(model):
 
     return list(lora_module_names)
 
-def save_model(accelerator, model, output_dir):
+def save_model(accelerator, model, output_dir, deepspeed):
     accelerator.print(f"Saving model to {output_dir}")
     
     accelerator.wait_for_everyone()
     
-    if args.deepspeed:
+    if deepspeed:
         state_dict = accelerator.get_state_dict(model)
     else:
         full_state_dict_config = FullStateDictConfig(
@@ -43,7 +43,7 @@ def save_model(accelerator, model, output_dir):
         with FSDP.state_dict_type(model, StateDictType.FULL_STATE_DICT, full_state_dict_config):
             state_dict = accelerator.get_state_dict(model, unwrap=False)
     accelerator.unwrap_model(model).save_pretrained(
-        f"{args.output_dir}",
+        f"{output_dir}",
         is_main_process=accelerator.is_main_process,
         save_function=accelerator.save,
         state_dict=state_dict,
@@ -238,7 +238,7 @@ def main(args):
 
                 if isinstance(args.checkpointing_steps, int) and completed_steps > 0:
                     if completed_steps % args.checkpointing_steps == 0:
-                        save_model(accelerator, model, args.output_dir)
+                        save_model(accelerator, model, args.output_dir, args.deepspeed)
 
                         previous_dir = f"step_{completed_steps-args.checkpointing_steps}"
                         previous_dir = os.path.join(args.output_dir, previous_dir)
@@ -261,7 +261,7 @@ def main(args):
     accelerator.print(f"Training Finished")
     accelerator.end_training()
 
-    save_model(accelerator, model, args.output_dir)
+    save_model(accelerator, model, args.output_dir, args.deepspeed)
 
 
 if __name__ == "__main__":

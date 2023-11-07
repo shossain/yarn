@@ -152,7 +152,7 @@ def main(args):
     if args.deepspeed:
         optim = DummyOptim(model.parameters(), lr=args.learning_rate)
         scheduler = DummyScheduler(
-            optim, num_training_steps=args.max_train_steps, num_warmup_steps=args.warmup_steps)
+            optim, total_num_steps=args.max_train_steps, warmup_num_steps=args.warmup_steps)
         model, optim, train_loader, scheduler = accelerator.prepare(
             model, optim, train_loader, scheduler
         )

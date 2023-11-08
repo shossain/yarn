@@ -30,7 +30,7 @@ def find_all_linear_names(model):
 
     return list(lora_module_names)
 
-def save_model(accelerator, model, config, output_dir, deepspeed):
+def save_model(accelerator, model, output_dir, deepspeed):
     accelerator.print(f"Saving model to {output_dir}")
     
     accelerator.wait_for_everyone()
@@ -49,7 +49,6 @@ def save_model(accelerator, model, config, output_dir, deepspeed):
         state_dict=state_dict,
     )
 
-    config.save_pretrained(f"{output_dir}/model")
 
     accelerator.print(f"Saving Finished")
 
@@ -239,7 +238,7 @@ def main(args):
 
                 if isinstance(args.checkpointing_steps, int) and completed_steps > 0:
                     if completed_steps % args.checkpointing_steps == 0:
-                        save_model(accelerator, model, config, args.output_dir, args.deepspeed)
+                        save_model(accelerator, model, args.output_dir, args.deepspeed)
 
                         previous_dir = f"step_{completed_steps-args.checkpointing_steps}"
                         previous_dir = os.path.join(args.output_dir, previous_dir)
@@ -262,7 +261,7 @@ def main(args):
     accelerator.print(f"Training Finished")
     accelerator.end_training()
 
-    save_model(accelerator, model, config, args.output_dir, args.deepspeed)
+    save_model(accelerator, model, args.output_dir, args.deepspeed)
 
 
 if __name__ == "__main__":

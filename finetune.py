@@ -208,12 +208,13 @@ def main(args):
         accelerator.print(f"Resuming training from step {resume_step}")
 
     model.train()
+    accelerator.print(f"Model Config: ${ model.config}")
 
     while completed_steps < args.max_train_steps:
         for step, batch in enumerate(train_loader):
-            if sliding_window_attention_schedule is not None:
-                model.config.sliding_window = sliding_window_attention_schedule[completed_steps % len(
-                    sliding_window_attention_schedule)]
+            # if sliding_window_attention_schedule is not None:
+            #     model.config.sliding_window = sliding_window_attention_schedule[completed_steps % len(
+            #         sliding_window_attention_schedule)]
 
             with accelerator.accumulate(model):
                 loss = model(**batch).loss

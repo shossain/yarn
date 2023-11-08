@@ -43,7 +43,7 @@ def save_model(accelerator, model, output_dir, deepspeed):
         with FSDP.state_dict_type(model, StateDictType.FULL_STATE_DICT, full_state_dict_config):
             state_dict = accelerator.get_state_dict(model, unwrap=False)
     accelerator.unwrap_model(model).save_pretrained(
-        f"{output_dir}",
+        f"{output_dir}/model",
         is_main_process=accelerator.is_main_process,
         save_function=accelerator.save,
         state_dict=state_dict,

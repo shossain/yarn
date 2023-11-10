@@ -29,6 +29,7 @@ def main(args):
         trust_remote_code=True,
         low_cpu_mem_usage=True,
         torch_dtype=torch.bfloat16,
+        use_flash_attention_2=True,
         quantization_config=quantization_config, 
         #device_map='auto'
     )#.to("cuda")

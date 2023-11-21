@@ -21,7 +21,7 @@ def main(args):
         dataset=dataset,
         desc_act=True,
         tokenizer=tokenizer,
-        model_seqlen=16 * 1024 # might not be needed
+        model_seqlen=32 * 1024 # might not be needed
     )
     # Load the model from HF
     quant_model = AutoModelForCausalLM.from_pretrained(
